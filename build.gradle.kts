@@ -18,6 +18,13 @@ allprojects {
             }
         }
     }
+
+    // Fallback: substitute missing custom-packaged apktool-lib to the official Maven Central coordinate.
+    configurations.configureEach {
+        resolutionStrategy.dependencySubstitution {
+            substitute(module("kofua.app.revanced:apktool-lib")).using(module("org.apktool:apktool-lib:2.9.3"))
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {
