@@ -1,0 +1,87 @@
+name: Patch Bilibili APK
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: Bilibili APK download URL override
+        required: false
+        default: https://dl.hdslb.com/mobile/latest/android64/iBiliPlayer-bili.apk
+  release:
+    types: [published]
+
+jobs:
+  patch:
+    name: Build patched APK and publish release asset
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'release' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download CI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          # Download all artifacts from the triggering workflow run
+          # The CI uploads 'build' dir under name 'BiliRoamingX-${{ env.VERSION }}'
+          # Here we download all and locate the needed files.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+          path: ci-artifacts
+
+      - name: Prepare script
+        run: |
+          chmod +x scripts/patch_bilibili.sh
+
+      - name: Set up JDK 17 (match CI)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Run patch script
+        env:
+          APK_URL: ${{ github.event.inputs.apk_url || '' }}
+          ARTIFACTS_DIR: ci-artifacts
+          BUILD_DIR: build
+        run: |
+          scripts/patch_bilibili.sh
+
+      - name: Resolve output
+        id: resolve
+        run: |
+          set -euo pipefail
+          test -f build/patch-result.txt
+          APK=$(cat build/patch-result.txt)
+          echo "apk=$APK" >> $GITHUB_OUTPUT
+          echo "Resolved APK=$APK"
+
+      - name: Upload patched APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: bilibili-patched
+          path: |
+            build/${{ steps.resolve.outputs.apk }}
+            build/bilibili-patch-full.log
+            build/bilibili-patch-min.log
+            build/bilibili-patched.sha256
+
+      - name: Create/Update Release and upload asset
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name || 'latest' }}
+          name: Automated patched build
+          files: build/${{ steps.resolve.outputs.apk }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
