@@ -275,6 +275,8 @@ object Settings {
             clearSplashConfigCache()
         }
     })
+    // 当开启时，跳过服务端黑名单/资格校验并强制视为未封禁（默认开启）
+    @JvmField val DisableUserStatusCheck = BooleanSetting(key = "disable_user_status_check", defValue = true)
     @JvmField val DisallowCollectPrivacyInfo = BooleanSetting(key = "disallow_collect_privacy_info", needReboot = true)
     @JvmField val DisableWebViewNonOfficialAlert = BooleanSetting(key = "disable_non_official_alert")
     // endregion
