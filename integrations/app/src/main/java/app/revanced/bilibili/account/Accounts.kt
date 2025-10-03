@@ -172,6 +172,17 @@ object Accounts {
 
     @JvmStatic
     private fun checkUserStatus() = runCatching {
+        // 若用户在设置中关闭了资格/黑名单校验，则直接跳过并清理可能残留的封禁状态
+        if (Settings.DisableUserStatusCheck()) {
+            val mid = Accounts.mid
+            if (mid > 0) {
+                val blockedKey = "user_blocked_" + mid
+                if (cachePrefs.getBoolean(blockedKey, false))
+                    cachePrefs.edit { putBoolean(blockedKey, false) }
+            }
+            userBlocked = false
+            return@runCatching
+        }
         val mid = Accounts.mid
         if (mid <= 0) return@runCatching
         val checkInterval = TimeUnit.HOURS.toMillis(1)
